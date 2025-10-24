@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>👗 Memory Match – Fashion (2P Mode, No Sound)</title>
+<style>
+:root{
+  --bg:#0b0b0d; --panel:#121215; --card:#1d1f24; --flipped:#2a2d35;
+  --accent:#10b981; --accent2:#60a5fa; --bad:#ef4444; --ink:#e7eaee; --muted:#aeb7c4; --border:#2b2e36;
+  --skeleton1:#23252c; --skeleton2:#2a2d35;
+}
+html[data-theme="light"]{
+  --bg:#f6f8fb; --panel:#fff; --card:#f3f6fb; --flipped:#e9eef7;
+  --accent:#0ea56c; --accent2:#3b82f6; --bad:#dc2626; --ink:#0f172a; --muted:#475569; --border:#cbd5e1;
+  --skeleton1:#e6ebf5; --skeleton2:#f0f4fb;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;
+  background:var(--bg); color:var(--ink); display:flex; min-height:100vh; align-items:center; justify-content:center;
+}
+.wrap{width:clamp(320px,95vw,1100px);padding:16px}
+h1{font-size:1.6rem;margin:0 0 8px;font-weight:800;text-align:center}
+.controls{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:12px}
+select,button,label.switch{
+  background:var(--panel);color:var(--ink);border:1px solid var(--border);
+  padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600
+}
+button.primary{background:var(--accent);border-color:transparent;color:#04110c}
+button.ghost{background:transparent;color:var(--muted)}
+button:disabled{opacity:.55;cursor:not-allowed}
+
+.stats{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-bottom:8px;font-size:.95rem;color:var(--muted)}
+.stat b{color:var(--ink)}
+.badge{padding:2px 8px;border-radius:999px;background:var(--card);border:1px solid var(--border);color:var(--muted)}
+.combo{margin-left:6px;font-weight:800}
+
+.board{display:none;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.player{padding:4px 10px;border:1px solid var(--border);border-radius:10px;background:var(--panel)}
+.player.active{outline:2px solid var(--accent)}
+.pill{padding:4px 10px;border-radius:999px;background:var(--card);border:1px solid var(--border);color:var(--ink);font-weight:700}
+
+.grid{
+  display:grid;
+  grid-template-columns:repeat(8,minmax(36px,1fr)); /* compact cards */
+  gap:6px;
+  padding:8px;
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:12px;
+  box-shadow:0 6px 30px rgba(0,0,0,.15);
+  perspective:1000px;
+  position:relative;
+}
+.tile{
+  position:relative;
+  aspect-ratio:1/1;
+  border-radius:8px;
+  user-select:none;
+  border:none;
+  background:transparent;
+  cursor:pointer;
+  transform-style:preserve-3d;
+  transition:transform .28s ease;
+  outline:none;
+}
+.tile:focus-visible{box-shadow:0 0 0 2px var(--accent2)}
+.face{
+  position:absolute;inset:0;display:grid;place-items:center;
+  border-radius:8px;border:1px solid var(--border);
+  backface-visibility:hidden;overflow:hidden;
+}
+.front{background:var(--card)}
+.front.skel {
+  background: linear-gradient(90deg, var(--skeleton1), var(--skeleton2), var(--skeleton1));
+  background-size: 200% 100%;
+  animation: shimmer 1.2s infinite;
+}
+@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+.back{background:var(--flipped);transform:rotateY(180deg)}
+.tile.flipped{transform:rotateY(180deg)}
+.tile.matched .front,.tile.matched .back{
+  border-color:var(--accent);
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--accent),transparent 40%) inset;
+}
+.photo{width:100%;height:100%;object-fit:cover;display:block}
+.caption{
+  position:absolute;left:6px;right:6px;bottom:6px;
+  display:flex;gap:6px;align-items:center;justify-content:space-between;
+  padding:4px 6px;border-radius:6px;
+  background:linear-gradient(180deg,rgba(0,0,0,.0),rgba(0,0,0,.45));
+  color:#fff;font-weight:700;font-size:.8rem;
+}
+.caption a{color:#e9eef7;text-decoration:none}
+.caption a:hover{text-decoration:underline}
+
+.msg{text-align:center;margin-top:10px;font-weight:700;min-height:1.5em}
+.footer{text-align:center;color:var(--muted);margin-top:8px;font-size:.85rem}
+.switch{display:inline-flex;align-items:center;gap:6px}
+.switch input{transform:scale(1.1)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>👗 Memory Match — Fashion Edition</h1>
+  <div class="controls">
+    <select id="pack" title="Category">
+      <option value="women" selected>Women</option>
+      <option value="men">Men</option>
+      <option value="accessories">Accessories</option>
+      <option value="shoes">Shoes</option>
+      <option value="mixed">Mixed</option>
+    </select>
+    <select id="level" title="Difficulty">
+      <option value="easy" selected>Easy (4 pairs)</option>
+      <option value="medium">Medium (8 pairs)</option>
+      <option value="hard">Hard (12 pairs)</option>
+    </select>
+    <select id="mode" title="Mode">
+      <option value="classic" selected>Classic</option>
+      <option value="countdown">Countdown</option>
+    </select>
+
+    <label class="switch" title="Two-Player Hot-Seat">
+      <input type="checkbox" id="twoP"> 2P
+    </label>
+
+    <button class="primary" id="restart">🔄 Restart</button>
+    <button class="ghost" id="shuffle">🔀 Shuffle</button>
+    <button class="ghost" id="hint">🪄 Hint (<span id="hleft">—</span>)</button>
+    <button class="ghost" id="pause">⏸️ Pause</button>
+    <button id="theme">🌗 Theme</button>
+  </div>
+
+  <div class="stats">
+    <span class="stat">⏱️ Time: <b id="time">0</b>s</span>
+    <span class="stat">🪪 Moves: <b id="moves">0</b></span>
+    <span class="stat" id="onePScoreStat">⭐ Score: <b id="score">0</b> <span id="combo" class="combo" aria-live="polite"></span></span>
+    <span class="stat"><span id="pairsLeft" class="badge">Pairs left: —</span></span>
+    <span class="stat" id="bestWrap">🥇 Best Time (<span id="bestLabel">Easy • Classic • Women</span>): <b id="best">—</b> • 🏅 Best Score: <b id="bestScore">—</b></span>
+  </div>
+
+  <div class="board" id="board">
+    <div id="p1" class="player active">P1: <b id="p1s">0</b></div>
+    <div id="p2" class="player">P2: <b id="p2s">0</b></div>
+    <span id="turnPill" class="pill">Turn: P1</span>
+  </div>
+
+  <main class="grid" id="grid" aria-live="polite"></main>
+  <div class="msg" id="msg"></div>
+  <div class="footer">Flip cards to match pairs. Press <kbd>P</kbd> to pause. In 2P, turns swap on a miss; matches keep your turn. 🔗</div>
+</div>
+
+<script>
+/* ==== Catalog (4 items each, your images + fixed links) ==== */
+const CATALOG = {
+  women: [
+    { name: "silk dress", img: "https://uploads.onecompiler.io/43v9q6euh/43whv6e3b/Sadira%20Pink%20Strapless%20Ruffle%20Dress.jpg", link: "https://unsplash.com/photos/Yx-lWg4g5p0" },
+    { name: "blouse",     img: "https://uploads.onecompiler.io/43v9q6euh/43z9gc74k/fb32fbcf-f78e-4e79-b930-548c6963dcad.jpg", link: "https://unsplash.com/photos/WhXJp8f9ak8" },
+    { name: "handbag",    img: "https://uploads.onecompiler.io/43v9q6euh/43whv6e3b/Anjou%20Mini%20Bag.jpg", link: "https://unsplash.com/photos/RHjG7zE-6g8" },
+    { name: "high heels", img: "https://uploads.onecompiler.io/43v9q6euh/43z9gc74k/43a24be3-9d54-4d8d-a9a0-1d5f3d79b44b.jpg", link: "https://unsplash.com/photos/AF-vZCzbu6E" }
+  ],
+  men: [
+    { name: "suit men",   img: "https://uploads.onecompiler.io/43v9q6euh/43z9gc74k/For%20those%20who%20seek%20timeless%20elegance%20with%20a%20modern%E2%80%A6.jpg", link: "https://unsplash.com/photos/xJY-7gtC38o" },
+    { name: "hoodie men", img: "https://uploads.onecompiler.io/43v9q6euh/43z9gc74k/Workation%20Oversize%20Hoodie%20%E2%80%93%20AnotherCottonLab.jpg", link: "https://unsplash.com/photos/jrjzJpB1Yp4" },
+    { name: "jeans men",  img: "https://uploads.onecompiler.io/43v9q6euh/43z9gc74k/a3b7ed9f-ce84-43a1-9548-d5161ed0e623.jpg", link: "https://unsplash.com/photos/EtOMMg1N1yY" },
+    { name: "watch men",  img: "https://uploads.onecompiler.io/43v9q6euh/43z9gc74k/43939643-999a-4372-912e-48668c06ea16.jpg", link: "https://unsplash.com/photos/pYyOZ8q7AII" }
+  ],
+  accessories: [
+    { name: "sunglasses", img: "https://uploads.onecompiler.io/43v9q6euh/43z9gc74k/Cat%20Eye%20Sunglass%20Brand%20New%20Ysl%20St%20Cat%20Eye%E2%80%A6.jpg", link: "https://unsplash.com/photos/RvscqKjrFJM" },
+    { name: "bracelet",   img: "https://uploads.onecompiler.io/43v9q6euh/43z9gc74k/Carry%20a%20touch%20of%20style%20with%20the%20bracelet,%20a%E2%80%A6.jpg", link: "https://unsplash.com/photos/ZRns2R5azu0" },
+    { name: "wallet",     img: "https://uploads.onecompiler.io/43v9q6euh/43z9gc74k/Though%20slim,%20SAINT%20LAURENT's%20cardholder%20has%20enough%E2%80%A6.jpg", link: "https://unsplash.com/photos/T1Yvmf4oleQ" },
+    { name: "belt",       img: "https://uploads.onecompiler.io/43v9q6euh/43z9gc74k/Powered%20by%20Y2K%20nostalgia,%20the%20haute-denim%20brand's%E2%80%A6.jpg", link: "https://unsplash.com/photos/vQWqGqOKCJs" }
+  ],
+  shoes: [
+    { name: "sneakers", img: "https://uploads.onecompiler.io/43v9q6euh/43z9gc74k/1cab4b3d-458d-4990-9edb-7a162acb0d5f.jpg", link: "https://unsplash.com/photos/-oVaYMgBMbs" },
+    { name: "heels",    img: "https://uploads.onecompiler.io/43v9q6euh/43z9gc74k/61f1d554-ea3d-40b9-83e3-b2b9a066b1d4.jpg", link: "https://unsplash.com/photos/Mx1x8pO-jK0" },
+    { name: "loafers",  img: "https://uploads.onecompiler.io/43v9q6euh/43z9gc74k/Comfortable%20&%20Classic%20Women's%20Penny%20Loafer%20in%E2%80%A6.jpg", link: "https://unsplash.com/photos/qM5pOr2UuGA" },
+    { name: "sandals",  img: "https://uploads.onecompiler.io/43v9q6euh/43z9gc74k/9238c1ce-7647-478a-bdc7-af94d3842b2a.jpg", link: "https://unsplash.com/photos/Ftnx8D1F95A" }
+  ]
+};
+
+const PACKS=["women","men","accessories","shoes","mixed"];
+function buildPool(pack, need){
+  let items = pack==="mixed"
+    ? [...CATALOG.women, ...CATALOG.men, ...CATALOG.accessories, ...CATALOG.shoes] // 16 items
+    : CATALOG[pack]; // 4 items
+  const arr=[...items];
+  while(arr.length<need) arr.push(...items);
+  return arr.slice(0,need);
+}
+
+/* ==== Levels, Modes, Scoring ==== */
+const LEVELS={
+  easy:{pairs:4, cols:4, limit:50, hints:2},
+  medium:{pairs:8, cols:4, limit:90, hints:2},
+  hard:{pairs:12, cols:6, limit:140, hints:1}
+};
+const MODE_CLASSIC='classic', MODE_COUNTDOWN='countdown';
+const SCORE = {
+  match: 10, miss: -1, comboStep: 3, hintPenalty: -3,
+  finishBonus:(pairs,moves,seconds)=> Math.max(0, Math.round((pairs*20)-(moves*0.6)-(seconds*0.7)))
+};
+
+/* ==== Personal Bests (1P local only) ==== */
+const bestTimeKey  = (lvl, md, pk)=> `mem-best-time-${md}-${lvl}-${pk}`;
+const bestScoreKey = (lvl, md, pk)=> `mem-best-score-${md}-${lvl}-${pk}`;
+const getBestTime  = (lvl,md,pk)=> { const v=localStorage.getItem(bestTimeKey(lvl,md,pk)); return v?Number(v):null; };
+const getBestScore = (lvl,md,pk)=> { const v=localStorage.getItem(bestScoreKey(lvl,md,pk)); return v?Number(v):null; };
+const saveBestTime = (val,lvl,md,pk)=>{ const cur=getBestTime(lvl,md,pk); if(cur===null || val<cur) localStorage.setItem(bestTimeKey(lvl,md,pk), String(val)); };
+const saveBestScore= (val,lvl,md,pk)=>{ const cur=getBestScore(lvl,md,pk); if(cur===null || val>cur) localStorage.setItem(bestScoreKey(lvl,md,pk), String(val)); };
+
+/* ==== State ==== */
+let level="easy", pack="women", mode=MODE_CLASSIC, twoP=false;
+let deck=[], first=null, lock=false, found=0, moves=0, score=0, seconds=0, timer=null, paused=false, combo=0, hintsLeft=0;
+let pTurn=1, p1Score=0, p2Score=0;
+
+const g = document.getElementById("grid"),
+      timeE = document.getElementById("time"),
+      movesE = document.getElementById("moves"),
+      scoreE = document.getElementById("score"),
+      msgE = document.getElementById("msg"),
+      comboE = document.getElementById("combo"),
+      pairsLeftE = document.getElementById("pairsLeft"),
+      bestE = document.getElementById("best"),
+      bestScoreE = document.getElementById("bestScore"),
+      bestLabelE = document.getElementById("bestLabel"),
+      board = document.getElementById("board"),
+      p1s = document.getElementById("p1s"),
+      p2s = document.getElementById("p2s"),
+      p1El = document.getElementById("p1"),
+      p2El = document.getElementById("p2"),
+      turnPill = document.getElementById("turnPill"),
+      onePScoreStat = document.getElementById("onePScoreStat"),
+      bestWrap = document.getElementById("bestWrap");
+
+/* ==== No-sound noop ==== */
+function play(){ /* silence is golden */ }
+
+/* ==== Theme ==== */
+document.getElementById("theme").onclick=()=>{
+  const now=document.documentElement.getAttribute("data-theme");
+  const next=now==="dark"?"light":"dark";
+  document.documentElement.setAttribute("data-theme",next);
+  document.getElementById("theme").textContent=next==="dark"?"🌞 Light":"🌙 Dark";
+};
+
+/* ==== Controls ==== */
+document.getElementById("restart").onclick=()=> init(level, mode, pack, twoP);
+document.getElementById("shuffle").onclick=()=> shuffleOpen();
+document.getElementById("hint").onclick=()=> useHint();
+document.getElementById("pause").onclick=()=> setPaused(!paused);
+document.getElementById("pack").onchange=e=>{ pack=e.target.value; init(level,mode,pack,twoP); };
+document.getElementById("level").onchange=e=>{ level=e.target.value; init(level,mode,pack,twoP); };
+document.getElementById("mode").onchange=e=>{ mode=e.target.value; init(level,mode,pack,twoP); };
+document.getElementById("twoP").onchange=e=>{ twoP=e.target.checked; init(level,mode,pack,twoP); };
+document.addEventListener('keydown', e=>{ if(e.key.toLowerCase()==='p') setPaused(!paused); });
+
+/* ==== Init / Reset ==== */
+function init(lvl=level, md=mode, pk=pack, is2P=twoP){
+  clearInterval(timer); timer=null; paused=false;
+  level=lvl; mode=md; pack=pk; twoP=is2P;
+
+  const {pairs, cols, hints}=LEVELS[level];
+  hintsLeft = hints;
+  document.getElementById('hleft').textContent=hintsLeft;
+
+  // labels & bests (1P only)
+  bestLabelE.textContent = `${cap(level)} • ${cap(mode)} • ${cap(pack)}`;
+  renderBests();
+
+  // 2P UI visibility / 1P stats visibility
+  board.style.display = twoP ? 'flex' : 'none';
+  onePScoreStat.style.display = twoP ? 'none' : '';
+  bestWrap.style.display = twoP ? 'none' : '';
+
+  // state
+  first=null; lock=false; found=0; moves=0; score=0; seconds=(mode===MODE_COUNTDOWN? LEVELS[level].limit : 0); combo=0;
+  timeE.textContent=seconds; movesE.textContent=0; scoreE.textContent=0; comboE.textContent=''; msgE.textContent='';
+  g.style.gridTemplateColumns=`repeat(${cols},minmax(36px,1fr))`;
+
+  // 2P reset
+  pTurn=1; p1Score=0; p2Score=0; p1s.textContent='0'; p2s.textContent='0';
+  p1El.classList.add('active'); p2El.classList.remove('active'); turnPill.textContent='Turn: P1';
+
+  // deck
+  const pool=buildPool(pack,pairs);
+  deck=[...pool,...pool].sort(()=>Math.random()-0.5);
+
+  // render
+  g.innerHTML='';
+  deck.forEach((item,i)=>{
+    const t=document.createElement("button");
+    t.className="tile";
+    t.setAttribute('data-index', i);
+    t.addEventListener('click', ()=> flip(i,t));
+    t.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); t.click(); }});
+    const front=document.createElement("div"); front.className="face front skel"; // skeleton first
+    const back=document.createElement("div"); back.className="face back";
+    const img=document.createElement("img"); img.className="photo"; img.alt=item.name; img.loading="lazy"; img.src=item.img;
+    img.addEventListener('load', ()=> front.classList.remove('skel'));
+    // Full-card open after matched (also keep caption links)
+    back.addEventListener('click', (ev)=>{
+      if(t.classList.contains('matched')) window.open(item.link, '_blank','noopener');
+      ev.stopPropagation();
+    });
+    const cap=document.createElement("div"); cap.className="caption";
+    const a=document.createElement("a"); a.href=item.link; a.target="_blank"; a.rel="noopener noreferrer"; a.textContent=item.name;
+    const icon=document.createElement("a"); icon.href=item.link; icon.target="_blank"; icon.rel="noopener noreferrer"; icon.textContent="🔗";
+    cap.append(a,icon); back.append(img,cap);
+    t.append(front,back); g.appendChild(t);
+  });
+
+  // pairs left
+  updatePairsLeft();
+
+  // timer
+  timer=setInterval(()=>{
+    if(paused) return;
+    if(mode===MODE_COUNTDOWN){
+      seconds-=1; timeE.textContent=seconds;
+      if(seconds<=0){ clearInterval(timer); timer=null; gameOver(); }
+    } else {
+      seconds+=1; timeE.textContent=seconds;
+    }
+  },1000);
+}
+
+/* ==== Helpers ==== */
+const cap = s => s[0].toUpperCase()+s.slice(1);
+function updatePairsLeft(){ const left=(deck.length-found)/2; document.getElementById('pairsLeft').textContent=`Pairs left: ${left}`; }
+function renderBests(){
+  if(twoP){ bestE.textContent='—'; bestScoreE.textContent='—'; return; }
+  const bt=getBestTime(level, mode, pack);
+  const bs=getBestScore(level, mode, pack);
+  bestE.textContent = bt===null?'—': bt+'s';
+  bestScoreE.textContent = bs===null?'—': bs;
+}
+function showCombo(){ if(combo>1){ comboE.textContent=`Combo x${combo}! +${SCORE.comboStep*(combo-1)}`; setTimeout(()=> comboE.textContent='', 900); } }
+function setTurn(p){ pTurn=p; p1El.classList.toggle('active', pTurn===1); p2El.classList.toggle('active', pTurn===2); turnPill.textContent=`Turn: P${pTurn}`; }
+function addPoints(pts){
+  if(!twoP){ score+=pts; scoreE.textContent=score; return; }
+  if(pTurn===1){ p1Score=Math.max(0, p1Score+pts); p1s.textContent=p1Score; }
+  else { p2Score=Math.max(0, p2Score+pts); p2s.textContent=p2Score; }
+}
+
+/* ==== Shuffle remaining ==== */
+function shuffleOpen(){
+  if(paused) return;
+  const tiles=[...g.querySelectorAll('.tile')];
+  const openIdx=tiles.map((el,idx)=> el.classList.contains('matched')?null:idx).filter(i=>i!==null);
+  const values=openIdx.map(i=> deck[i]); // unmatched values
+  for(let i=values.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [values[i],values[j]]=[values[j],values[i]]; }
+  openIdx.forEach((i,k)=> deck[i]=values[k]);
+  tiles.forEach(t=>{ if(!t.classList.contains('matched')) t.classList.remove('flipped'); });
+  first=null; lock=false; combo=0; comboE.textContent='';
+  msgE.textContent='🔀 Shuffled!'; setTimeout(()=> msgE.textContent='', 900);
+}
+
+/* ==== Hint ==== */
+function useHint(){
+  if(paused || hintsLeft<=0 || lock) return;
+  const map={};
+  deck.forEach((v,idx)=>{ const el=g.querySelector(`.tile[data-index="${idx}"]`); if(el.classList.contains('matched')) return; (map[v.name]??=[]).push(idx); });
+  const candidates = Object.values(map).filter(a=>a.length>=2);
+  if(!candidates.length){ msgE.textContent='No pairs to hint!'; setTimeout(()=> msgE.textContent='', 800); return; }
+  const pair=candidates[Math.floor(Math.random()*candidates.length)].slice(0,2);
+  const [i1,i2]=pair; const el1=g.querySelector(`.tile[data-index="${i1}"]`); const el2=g.querySelector(`.tile[data-index="${i2}"]`);
+  lock=true; el1.classList.add('flipped'); el2.classList.add('flipped'); if(navigator.vibrate) navigator.vibrate(15);
+  if(!twoP){ addPoints(SCORE.hintPenalty); }
+  hintsLeft--; document.getElementById('hleft').textContent=hintsLeft;
+  setTimeout(()=>{ if(!el1.classList.contains('matched')) el1.classList.remove('flipped'); if(!el2.classList.contains('matched')) el2.classList.remove('flipped'); lock=false; }, 900);
+}
+
+/* ==== Pause ==== */
+function setPaused(on){
+  if(paused===on) return;
+  paused=on;
+  document.getElementById('pause').textContent = paused ? '▶️ Resume' : '⏸️ Pause';
+}
+
+/* ==== Flip logic ==== */
+function flip(i,el){
+  if(paused || lock || el.classList.contains("flipped") || el.classList.contains("matched"))return;
+  el.classList.add("flipped");
+  if(first===null){ first=i; return; }
+
+  lock=true;
+  const el2=g.querySelector(`.tile[data-index="${first}"]`);
+  const a=deck[first], b=deck[i];
+  movesE.textContent=++moves;
+
+  if(a.name===b.name){
+    play(); // no sound
+    el.classList.add("matched"); el2.classList.add("matched");
+    found+=2; combo+=1;
+    const gain = SCORE.match + SCORE.comboStep*(combo-1);
+    addPoints(gain);
+    showCombo();
+    // matched card anywhere opens link
+    [el,el2].forEach(node=>{
+      node.addEventListener('click', ()=>{
+        window.open(a.link, '_blank', 'noopener');
+      }, { once:true });
+    });
+    first=null; lock=false; updatePairsLeft();
+    if(found===deck.length){ finish(); }
+  } else {
+    play(); // no sound
+    if(!twoP){ addPoints(SCORE.miss); } else { /* optional 2P miss penalty off */ }
+    combo=0; comboE.textContent='';
+    setTimeout(()=>{
+      el.classList.remove("flipped"); el2.classList.remove("flipped");
+      first=null; lock=false;
+      if(twoP) setTurn(pTurn===1?2:1);
+    }, 550);
+  }
+}
+
+/* ==== Finish / Game Over ==== */
+function finish(){
+  clearInterval(timer); timer=null;
+  let timeMetric = (mode===MODE_COUNTDOWN) ? (LEVELS[level].limit - seconds) : seconds; // seconds elapsed
+  const bonus = SCORE.finishBonus(deck.length/2, moves, (mode===MODE_COUNTDOWN ? timeMetric : seconds));
+  if(!twoP){
+    addPoints(bonus);
+    if(navigator.vibrate) navigator.vibrate([40,40,80]);
+    msgE.innerHTML = `🎉 Completed in <b>${(mode===MODE_COUNTDOWN? timeMetric: seconds)}s</b> with <b>${moves}</b> moves. Bonus: <b>+${bonus}</b>`;
+    // save personal bests
+    saveBestTime(timeMetric, level, mode, pack);
+    saveBestScore(score, level, mode, pack);
+    renderBests();
+  } else {
+    // 2P winner
+    let text = p1Score===p2Score ? '🤝 Tie!' : (p1Score>p2Score ? '🏆 P1 wins!' : '🏆 P2 wins!');
+    if(navigator.vibrate) navigator.vibrate([40,40,80]);
+    msgE.innerHTML = `${text} Time: <b>${(mode===MODE_COUNTDOWN? timeMetric: seconds)}s</b>, Moves: <b>${moves}</b>.`;
+  }
+}
+function gameOver(){
+  msgE.innerHTML=`⌛ <b>Time's up!</b> Try again.`;
+  if(navigator.vibrate) navigator.vibrate(120);
+  [...g.querySelectorAll('.tile')].forEach(t=> t.disabled=true);
+}
+
+/* ==== Start ==== */
+init();
+</script>
+</body>
+</html>
